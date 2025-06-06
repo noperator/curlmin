@@ -100,6 +100,11 @@ go test -v
 
 - https://github.com/portswigger/request-minimizer
 
+### To-do
+
+- [ ] optional delay between requests
+- [ ] detect session expiration
+
 ### License
 
 This project is licensed under the [MIT License](LICENSE.md).
