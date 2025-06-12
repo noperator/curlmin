@@ -71,5 +71,11 @@ func main() {
 	// Print instructions
 	fmt.Println("\n# To use this command with curlmin:")
 	fmt.Println("# 1. Start the test server: go run testserver/server.go")
-	fmt.Println("# 2. In another terminal, run: go run cmd/curlmin/main.go \"$(go run testserver/cmd/generate_test_curl.go)\"")
+	fmt.Println("# 2. In another terminal, run one of the following:")
+	fmt.Println("#    - Using --command/-c flag: go run cmd/curlmin/main.go --command \"$(go run testserver/cmd/generate_test_curl.go)\"")
+	fmt.Println("#      or with the shorthand option: go run cmd/curlmin/main.go -c \"$(go run testserver/cmd/generate_test_curl.go)\"")
+	fmt.Println("#    - Using a file: ")
+	fmt.Println("#      a. Save the output to a file: go run testserver/cmd/generate_test_curl.go > test_curl.txt")
+	fmt.Println("#      b. Run curlmin with the file: go run cmd/curlmin/main.go --file test_curl.txt")
+	fmt.Println("#         or with the shorthand option: go run cmd/curlmin/main.go -f test_curl.txt")
 }

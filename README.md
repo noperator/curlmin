@@ -25,24 +25,22 @@ Minimize everything by default (headers, cookies, and query parameters), or choo
 
 ```
 Usage of curlmin:
-  -body
-    	Compare body content (default true)
-  -bytes
-    	Compare byte count
-  -cookies
-    	Minimize cookies (default true)
-  -headers
-    	Minimize headers (default true)
-  -lines
-    	Compare line count
-  -params
-    	Minimize query parameters (default true)
-  -status
-    	Compare status code
-  -v	Verbose output
-  -words
-    	Compare word count
+      --body             Compare body content (default true)
+      --bytes            Compare byte count
+  -c, --command string   Curl command as a string
+      --cookies          Minimize cookies (default true)
+  -f, --file string      File containing the curl command
+      --headers          Minimize headers (default true)
+      --lines            Compare line count
+      --params           Minimize query parameters (default true)
+      --status           Compare status code
+  -v, --verbose          Verbose output
+      --words            Compare word count
 ```
+
+You must provide the curl command in one of two ways:
+1. Using the `--command` or `-c` flag to specify the curl command as a string
+2. Using the `--file` or `-f` flag to read the curl command from a file
 
 Use the provided test server to see how it works. Consider using the `-v` flag with `curlmin` so you can watch it progressively strip down the curl command.
 
@@ -69,7 +67,11 @@ Required authentication:
 #     -H 'Cookie: _gat=1; thisis=notneeded' \
 #     -b 'preference=dark; language=en; theme=blue' \
 #     'http://localhost:8080/api/test?auth_key=def456&timestamp=1623456789&tracking_id=abcdef123456&utm_source=test&utm_medium=cli&utm_campaign=curlmin'
-curlmin "$(go run testserver/cmd/generate_test_curl.go | grep -v '#')"
+
+# Using the --command/-c flag:
+curlmin --command "$(go run testserver/cmd/generate_test_curl.go | grep -v '#')"
+# or with the shorthand option:
+curlmin -c "$(go run testserver/cmd/generate_test_curl.go | grep -v '#')"
 
 # prints this resulting minimized command
 curl -H 'Authorization: Bearer xyz789' -H 'Cookie: session=abc123' 'http://localhost:8080/api/test?auth_key=def456'
@@ -81,7 +83,7 @@ Since this tool actually executes the curl command to check the server response,
 
 ```
 # didn't start test server (see example above)
-curlmin "$(go run testserver/cmd/generate_test_curl.go | grep -v '#')"
+curlmin -c "$(go run testserver/cmd/generate_test_curl.go | grep -v '#')"
 Error minimizing curl command: failed to get baseline response: failed to execute curl command: exit status 7, stderr:
 exit status 1
 ```
