@@ -42,6 +42,7 @@ func main() {
 		MinimizeHeaders: *minimizeHeaders,
 		MinimizeCookies: *minimizeCookies,
 		MinimizeParams:  *minimizeParams,
+		Verbose:         *verbose,
 	}
 
 	min := curlmin.New(options)

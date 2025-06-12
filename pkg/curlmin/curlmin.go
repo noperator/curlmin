@@ -17,6 +17,7 @@ type Options struct {
 	MinimizeHeaders bool
 	MinimizeCookies bool
 	MinimizeParams  bool
+	Verbose         bool
 }
 
 func DefaultOptions() Options {
@@ -24,6 +25,7 @@ func DefaultOptions() Options {
 		MinimizeHeaders: true,
 		MinimizeCookies: true,
 		MinimizeParams:  true,
+		Verbose:         false,
 	}
 }
 
@@ -96,6 +98,11 @@ func (m *Minimizer) executeCurlCommand(curlCmd string) (string, error) {
 
 	// Add the -o flag to save the response to the temporary file
 	curlCmd = fmt.Sprintf("%s -o %s -s", curlCmd, tmpFile.Name())
+
+	// Log the curl command if verbose mode is enabled
+	if m.options.Verbose {
+		fmt.Printf("Executing: %s\n", curlCmd)
+	}
 
 	// Execute the curl command
 	cmd := exec.Command("sh", "-c", curlCmd)
@@ -219,6 +226,9 @@ func (m *Minimizer) minimizeQueryParams(curl *CurlCommand, baselineResp string) 
 			}
 
 			if m.compareResponses(baselineResp, testResp) {
+				if m.options.Verbose {
+					fmt.Printf("Query parameter not needed: %s\n", param)
+				}
 				// If the response is the same, update the original curl command
 				// Create a new URL with the parameter removed
 				newURL := *parsedURL
@@ -246,6 +256,8 @@ func (m *Minimizer) minimizeQueryParams(curl *CurlCommand, baselineResp string) 
 
 				foundRemovable = true
 				break
+			} else if m.options.Verbose {
+				fmt.Printf("Query parameter needed: %s\n", param)
 			}
 		}
 
@@ -303,11 +315,28 @@ func (m *Minimizer) minimizeHeaders(curl *CurlCommand, baselineResp string) {
 
 			// Execute the test command
 			testResp, err := m.executeCurlCommand(testCmd)
+
+			// Get the header name for logging
+			var headerName string
+			if headerIndex+1 < len(curl.Command.Args) {
+				var headerBuf bytes.Buffer
+				printer := syntax.NewPrinter()
+				printer.Print(&headerBuf, curl.Command.Args[headerIndex+1])
+				headerStr := headerBuf.String()
+				headerStr = strings.Trim(headerStr, "'\"")
+				headerName = headerStr
+			}
+
 			if err == nil && m.compareResponses(baselineResp, testResp) {
 				// If the response is the same, update the original curl command
+				if m.options.Verbose {
+					fmt.Printf("Header not needed: %s\n", headerName)
+				}
 				curl.RemoveArg(headerIndex)
 				foundRemovable = true
 				break
+			} else if m.options.Verbose {
+				fmt.Printf("Header needed: %s\n", headerName)
 			}
 		}
 
@@ -381,9 +410,14 @@ func (m *Minimizer) minimizeCookies(curl *CurlCommand, baselineResp string) {
 							testResp, err := m.executeCurlCommand(testCmd)
 							if err == nil && m.compareResponses(baselineResp, testResp) {
 								// If the response is the same, update the original curl command
+								if m.options.Verbose {
+									fmt.Printf("Cookie not needed: %s\n", cookieName)
+								}
 								curl.RemoveCookieFromHeader(cookieIndex, cookieName)
 								foundRemovable = true
 								break
+							} else if m.options.Verbose {
+								fmt.Printf("Cookie needed: %s\n", cookieName)
 							}
 						}
 					}
@@ -414,11 +448,26 @@ func (m *Minimizer) minimizeCookies(curl *CurlCommand, baselineResp string) {
 
 					// Execute the test command
 					testResp, err := m.executeCurlCommand(testCmd)
+
+					// Get the cookie flag for logging
+					var cookieFlag string
+					if cookieIndex < len(curl.Command.Args) {
+						var flagBuf bytes.Buffer
+						printer := syntax.NewPrinter()
+						printer.Print(&flagBuf, curl.Command.Args[cookieIndex])
+						cookieFlag = flagBuf.String()
+					}
+
 					if err == nil && m.compareResponses(baselineResp, testResp) {
 						// If the response is the same, update the original curl command
+						if m.options.Verbose {
+							fmt.Printf("Cookie flag not needed: %s\n", cookieFlag)
+						}
 						curl.RemoveArg(cookieIndex)
 						foundRemovable = true
 						break
+					} else if m.options.Verbose {
+						fmt.Printf("Cookie flag needed: %s\n", cookieFlag)
 					}
 				}
 			}
