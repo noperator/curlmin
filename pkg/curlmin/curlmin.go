@@ -26,21 +26,6 @@ type Options struct {
 	CompareByteCount   bool
 }
 
-func DefaultOptions() Options {
-	return Options{
-		MinimizeHeaders: true,
-		MinimizeCookies: true,
-		MinimizeParams:  true,
-		Verbose:         false,
-		// Default to comparing body content only (current behavior)
-		CompareStatusCode:  false,
-		CompareBodyContent: true,
-		CompareWordCount:   false,
-		CompareLineCount:   false,
-		CompareByteCount:   false,
-	}
-}
-
 type Minimizer struct {
 	options Options
 }
@@ -175,53 +160,56 @@ func (m *Minimizer) executeCurlCommand(curlCmd string) (Response, error) {
 }
 
 func (m *Minimizer) compareResponses(resp1, resp2 Response) bool {
+	// Define comparison functions
+	comparisons := map[string]func(Response, Response) bool{
+		"status": func(r1, r2 Response) bool {
+			return r1.StatusCode == r2.StatusCode
+		},
+		"body": func(r1, r2 Response) bool {
+			hash1 := md5.Sum([]byte(r1.Body))
+			hash2 := md5.Sum([]byte(r2.Body))
+			return hex.EncodeToString(hash1[:]) == hex.EncodeToString(hash2[:])
+		},
+		"words": func(r1, r2 Response) bool {
+			return len(strings.Fields(r1.Body)) == len(strings.Fields(r2.Body))
+		},
+		"lines": func(r1, r2 Response) bool {
+			return len(strings.Split(r1.Body, "\n")) == len(strings.Split(r2.Body, "\n"))
+		},
+		"bytes": func(r1, r2 Response) bool {
+			return len(r1.Body) == len(r2.Body)
+		},
+	}
+
+	// Map options to comparison keys
+	optionsMap := map[string]bool{
+		"status": m.options.CompareStatusCode,
+		"body":   m.options.CompareBodyContent,
+		"words":  m.options.CompareWordCount,
+		"lines":  m.options.CompareLineCount,
+		"bytes":  m.options.CompareByteCount,
+	}
+
+	// Check if any comparison is enabled
+	anyEnabled := false
+	for _, enabled := range optionsMap {
+		if enabled {
+			anyEnabled = true
+			break
+		}
+	}
+
 	// If no comparison options are selected, default to body content
-	if !m.options.CompareStatusCode &&
-		!m.options.CompareBodyContent &&
-		!m.options.CompareWordCount &&
-		!m.options.CompareLineCount &&
-		!m.options.CompareByteCount {
-		m.options.CompareBodyContent = true
+	if !anyEnabled {
+		optionsMap["body"] = true
 	}
 
-	// Compare status code if selected
-	if m.options.CompareStatusCode {
-		if resp1.StatusCode != resp2.StatusCode {
-			return false
-		}
-	}
-
-	// Compare body content if selected
-	if m.options.CompareBodyContent {
-		hash1 := md5.Sum([]byte(resp1.Body))
-		hash2 := md5.Sum([]byte(resp2.Body))
-		if hex.EncodeToString(hash1[:]) != hex.EncodeToString(hash2[:]) {
-			return false
-		}
-	}
-
-	// Compare word count if selected
-	if m.options.CompareWordCount {
-		words1 := len(strings.Fields(resp1.Body))
-		words2 := len(strings.Fields(resp2.Body))
-		if words1 != words2 {
-			return false
-		}
-	}
-
-	// Compare line count if selected
-	if m.options.CompareLineCount {
-		lines1 := len(strings.Split(resp1.Body, "\n"))
-		lines2 := len(strings.Split(resp2.Body, "\n"))
-		if lines1 != lines2 {
-			return false
-		}
-	}
-
-	// Compare byte count if selected
-	if m.options.CompareByteCount {
-		if len(resp1.Body) != len(resp2.Body) {
-			return false
+	// Run all enabled comparisons
+	for key, enabled := range optionsMap {
+		if enabled {
+			if !comparisons[key](resp1, resp2) {
+				return false
+			}
 		}
 	}
 
@@ -283,46 +271,27 @@ func (m *Minimizer) minimizeQueryParams(curl *CurlCommand, baselineResp Response
 			testURL := *parsedURL
 			testURL.RawQuery = testQuery.Encode()
 
-			// Create a copy of the curl command
-			originalCmd, err := curl.ToString()
-			if err != nil {
-				continue
-			}
+			// Test if this parameter can be removed
+			canRemove, err := m.testModification(curl, baselineResp, func(c *CurlCommand) error {
+				// Find the URL index in the copy
+				copyUrlIndex, err := c.FindURLArg()
+				if err != nil {
+					return err
+				}
 
-			curlCopy, err := ParseCurlCommand(originalCmd)
-			if err != nil {
-				continue
-			}
-
-			// Find the URL index in the copy
-			copyUrlIndex, err := curlCopy.FindURLArg()
-			if err != nil {
-				continue
-			}
-
-			// Update the URL in the copy
-			word := &syntax.Word{
-				Parts: []syntax.WordPart{
-					&syntax.Lit{
-						Value: "'" + testURL.String() + "'",
+				// Update the URL in the copy
+				word := &syntax.Word{
+					Parts: []syntax.WordPart{
+						&syntax.Lit{
+							Value: "'" + testURL.String() + "'",
+						},
 					},
-				},
-			}
-			curlCopy.Command.Args[copyUrlIndex] = word
+				}
+				c.Command.Args[copyUrlIndex] = word
+				return nil
+			})
 
-			// Convert to string and test
-			testCmd, err := curlCopy.ToString()
-			if err != nil {
-				continue
-			}
-
-			// Execute the test command
-			testResp, err := m.executeCurlCommand(testCmd)
-			if err != nil {
-				continue
-			}
-
-			if m.compareResponses(baselineResp, testResp) {
+			if err == nil && canRemove {
 				if m.options.Verbose {
 					fmt.Printf("Query parameter not needed: %s\n", param)
 				}
@@ -390,29 +359,6 @@ func (m *Minimizer) minimizeHeaders(curl *CurlCommand, baselineResp Response) {
 				}
 			}
 
-			// Create a copy of the curl command
-			originalCmd, err := curl.ToString()
-			if err != nil {
-				continue
-			}
-
-			curlCopy, err := ParseCurlCommand(originalCmd)
-			if err != nil {
-				continue
-			}
-
-			// Remove the header
-			curlCopy.RemoveArg(headerIndex)
-
-			// Convert to string and test
-			testCmd, err := curlCopy.ToString()
-			if err != nil {
-				continue
-			}
-
-			// Execute the test command
-			testResp, err := m.executeCurlCommand(testCmd)
-
 			// Get the header name for logging
 			var headerName string
 			if headerIndex+1 < len(curl.Command.Args) {
@@ -424,7 +370,13 @@ func (m *Minimizer) minimizeHeaders(curl *CurlCommand, baselineResp Response) {
 				headerName = headerStr
 			}
 
-			if err == nil && m.compareResponses(baselineResp, testResp) {
+			// Test if this header can be removed
+			canRemove, err := m.testModification(curl, baselineResp, func(c *CurlCommand) error {
+				c.RemoveArg(headerIndex)
+				return nil
+			})
+
+			if err == nil && canRemove {
 				// If the response is the same, update the original curl command
 				if m.options.Verbose {
 					fmt.Printf("Header not needed: %s\n", headerName)
@@ -446,7 +398,10 @@ func (m *Minimizer) minimizeHeaders(curl *CurlCommand, baselineResp Response) {
 
 // testCookieRemoval tests if removing a specific cookie affects the response
 // Returns true if the cookie can be removed, false if it's needed
-func (m *Minimizer) testCookieRemoval(curl *CurlCommand, cookieIndex int, cookieName string, isHeader bool, baselineResp Response) (bool, error) {
+// testModification tests if a modification to the curl command affects the response
+// The modifyFunc is called on a copy of the curl command to make the modification
+// Returns true if the modification doesn't affect the response, false if it does
+func (m *Minimizer) testModification(curl *CurlCommand, baselineResp Response, modifyFunc func(*CurlCommand) error) (bool, error) {
 	// Create a copy of the curl command
 	originalCmd, err := curl.ToString()
 	if err != nil {
@@ -458,15 +413,10 @@ func (m *Minimizer) testCookieRemoval(curl *CurlCommand, cookieIndex int, cookie
 		return false, err
 	}
 
-	// Remove the cookie
-	var err2 error
-	if isHeader {
-		err2 = curlCopy.RemoveCookieFromHeader(cookieIndex, cookieName)
-	} else {
-		err2 = curlCopy.RemoveCookieFromCookieFlag(cookieIndex, cookieName)
-	}
-	if err2 != nil {
-		return false, err2
+	// Apply the modification
+	err = modifyFunc(curlCopy)
+	if err != nil {
+		return false, err
 	}
 
 	// Convert to string and test
@@ -483,6 +433,15 @@ func (m *Minimizer) testCookieRemoval(curl *CurlCommand, cookieIndex int, cookie
 
 	// Compare responses
 	return m.compareResponses(baselineResp, testResp), nil
+}
+
+func (m *Minimizer) testCookieRemoval(curl *CurlCommand, cookieIndex int, cookieName string, isHeader bool, baselineResp Response) (bool, error) {
+	return m.testModification(curl, baselineResp, func(c *CurlCommand) error {
+		if isHeader {
+			return c.RemoveCookieFromHeader(cookieIndex, cookieName)
+		}
+		return c.RemoveCookieFromCookieFlag(cookieIndex, cookieName)
+	})
 }
 
 func (m *Minimizer) minimizeCookies(curl *CurlCommand, baselineResp Response) {
@@ -517,29 +476,12 @@ func (m *Minimizer) minimizeCookies(curl *CurlCommand, baselineResp Response) {
 				isHeader := strings.HasPrefix(strings.ToLower(headerStr), "cookie:")
 
 				// First, try removing the entire cookie argument
-				originalCmd, err := curl.ToString()
-				if err != nil {
-					continue
-				}
+				canRemove, err := m.testModification(curl, baselineResp, func(c *CurlCommand) error {
+					c.RemoveArg(cookieIndex)
+					return nil
+				})
 
-				curlCopy, err := ParseCurlCommand(originalCmd)
-				if err != nil {
-					continue
-				}
-
-				// Remove the cookie argument
-				curlCopy.RemoveArg(cookieIndex)
-
-				// Convert to string and test
-				testCmd, err := curlCopy.ToString()
-				if err != nil {
-					continue
-				}
-
-				// Execute the test command
-				testResp, err := m.executeCurlCommand(testCmd)
-
-				if err == nil && m.compareResponses(baselineResp, testResp) {
+				if err == nil && canRemove {
 					// If the response is the same, update the original curl command
 					if m.options.Verbose {
 						if isHeader {

@@ -10,17 +10,6 @@ import (
 	"github.com/noperator/curlmin/pkg/curlmin"
 )
 
-// isFlagPassed checks if a flag was explicitly passed on the command line
-func isFlagPassed(name string) bool {
-	found := false
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == name {
-			found = true
-		}
-	})
-	return found
-}
-
 func main() {
 	// Minimization options
 	minimizeHeaders := flag.Bool("headers", true, "Minimize headers")
@@ -41,7 +30,14 @@ func main() {
 	if *compareStatusCode || *compareWordCount || *compareLineCount || *compareByteCount {
 		// The flag package sets compareBodyContent to true by default
 		// If the user didn't explicitly set it to true, we should disable it
-		if flag.Lookup("body").Value.String() == "true" && !isFlagPassed("body") {
+		bodyFlagExplicitlySet := false
+		flag.Visit(func(f *flag.Flag) {
+			if f.Name == "body" {
+				bodyFlagExplicitlySet = true
+			}
+		})
+
+		if flag.Lookup("body").Value.String() == "true" && !bodyFlagExplicitlySet {
 			*compareBodyContent = false
 		}
 	}

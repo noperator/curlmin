@@ -30,7 +30,17 @@ func TestMinimizeCurlCommand(t *testing.T) {
 	curlCmd := fmt.Sprintf(`curl -H 'Authorization: Bearer xyz789' -H 'User-Agent: Mozilla/5.0' -H 'Accept: text/html' -H 'Accept-Language: en-US,en;q=0.9' -H 'Cache-Control: max-age=0' -H 'Connection: keep-alive' -H 'Upgrade-Insecure-Requests: 1' -H 'Cookie: session=abc123' -H 'Cookie: _ga=GA1.2.1234567890.1623456789' -H 'Cookie: _gid=GA1.2.9876543210.1623456789' -H 'Cookie: _fbp=fb.1.1623456789.1234567890' -H 'Cookie: _gat=1' '%s/api/test?auth_key=def456&timestamp=1623456789&tracking_id=abcdef123456&utm_source=test&utm_medium=cli&utm_campaign=curlmin'`, server.URL)
 
 	// Create a minimizer with all options enabled
-	minimizer := New(DefaultOptions())
+	minimizer := New(Options{
+		MinimizeHeaders:    true,
+		MinimizeCookies:    true,
+		MinimizeParams:     true,
+		Verbose:            false,
+		CompareStatusCode:  false,
+		CompareBodyContent: true,
+		CompareWordCount:   false,
+		CompareLineCount:   false,
+		CompareByteCount:   false,
+	})
 
 	// Minimize the curl command
 	minimizedCmd, err := minimizer.MinimizeCurlCommand(curlCmd)

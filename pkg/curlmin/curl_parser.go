@@ -327,77 +327,66 @@ func parseCookieString(cookieStr string, cookieName string) (string, bool) {
 	return strings.Join(newCookies, "; "), false
 }
 
-// RemoveCookieFromHeader removes a specific cookie from a Cookie header
-func (c *CurlCommand) RemoveCookieFromHeader(headerIndex int, cookieName string) error {
-	if headerIndex < 1 || headerIndex >= len(c.Command.Args)-1 {
-		return fmt.Errorf("invalid header index")
+// RemoveCookieFromArg removes a specific cookie from either a Cookie header or a cookie flag
+// isHeader should be true for Cookie headers, false for cookie flags
+func (c *CurlCommand) RemoveCookieFromArg(argIndex int, cookieName string, isHeader bool) error {
+	if argIndex < 1 || argIndex >= len(c.Command.Args)-1 {
+		return fmt.Errorf("invalid argument index")
 	}
 
-	var headerBuf bytes.Buffer
+	var buf bytes.Buffer
 	printer := syntax.NewPrinter()
-	printer.Print(&headerBuf, c.Command.Args[headerIndex+1])
-	headerStr := headerBuf.String()
-	headerStr = strings.Trim(headerStr, "'\"")
-
-	if !strings.HasPrefix(strings.ToLower(headerStr), "cookie:") {
-		return fmt.Errorf("not a cookie header")
-	}
-
-	cookieStr := strings.TrimPrefix(headerStr, "Cookie:")
-	cookieStr = strings.TrimPrefix(cookieStr, "cookie:")
-
-	updatedCookieStr, allRemoved := parseCookieString(cookieStr, cookieName)
-
-	if allRemoved {
-		// If no cookies left, remove the entire header
-		c.RemoveArg(headerIndex)
-		return nil
-	}
-
-	// Create a new word node with the updated cookie header
-	word := &syntax.Word{
-		Parts: []syntax.WordPart{
-			&syntax.Lit{
-				Value: "'Cookie: " + updatedCookieStr + "'",
-			},
-		},
-	}
-
-	c.Command.Args[headerIndex+1] = word
-	return nil
-}
-
-// RemoveCookieFromCookieFlag removes a specific cookie from a -b/--cookie flag
-func (c *CurlCommand) RemoveCookieFromCookieFlag(cookieIndex int, cookieName string) error {
-	if cookieIndex < 1 || cookieIndex >= len(c.Command.Args)-1 {
-		return fmt.Errorf("invalid cookie index")
-	}
-
-	var cookieBuf bytes.Buffer
-	printer := syntax.NewPrinter()
-	printer.Print(&cookieBuf, c.Command.Args[cookieIndex+1])
-	cookieStr := cookieBuf.String()
+	printer.Print(&buf, c.Command.Args[argIndex+1])
+	cookieStr := buf.String()
 	cookieStr = strings.Trim(cookieStr, "'\"")
 
+	// For headers, we need to strip the "Cookie:" prefix
+	if isHeader {
+		if !strings.HasPrefix(strings.ToLower(cookieStr), "cookie:") {
+			return fmt.Errorf("not a cookie header")
+		}
+		cookieStr = strings.TrimPrefix(cookieStr, "Cookie:")
+		cookieStr = strings.TrimPrefix(cookieStr, "cookie:")
+	}
+
 	updatedCookieStr, allRemoved := parseCookieString(cookieStr, cookieName)
 
 	if allRemoved {
-		// If no cookies left, remove the entire cookie flag
-		c.RemoveArg(cookieIndex)
+		// If no cookies left, remove the entire argument
+		c.RemoveArg(argIndex)
 		return nil
 	}
 
 	// Create a new word node with the updated cookies
+	var value string
+	if isHeader {
+		value = "'Cookie: " + updatedCookieStr + "'"
+	} else {
+		value = "'" + updatedCookieStr + "'"
+	}
+
 	word := &syntax.Word{
 		Parts: []syntax.WordPart{
 			&syntax.Lit{
-				Value: "'" + updatedCookieStr + "'",
+				Value: value,
 			},
 		},
 	}
 
-	c.Command.Args[cookieIndex+1] = word
+	c.Command.Args[argIndex+1] = word
 	return nil
+}
+
+// RemoveCookieFromHeader removes a specific cookie from a Cookie header
+// This is a convenience wrapper around RemoveCookieFromArg
+func (c *CurlCommand) RemoveCookieFromHeader(headerIndex int, cookieName string) error {
+	return c.RemoveCookieFromArg(headerIndex, cookieName, true)
+}
+
+// RemoveCookieFromCookieFlag removes a specific cookie from a -b/--cookie flag
+// This is a convenience wrapper around RemoveCookieFromArg
+func (c *CurlCommand) RemoveCookieFromCookieFlag(cookieIndex int, cookieName string) error {
+	return c.RemoveCookieFromArg(cookieIndex, cookieName, false)
 }
 
 // ToString converts the curl command back to a string
