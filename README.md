@@ -56,7 +56,7 @@ Required authentication:
   Auth Token: Bearer xyz789
   Query Parameter: auth_key=def456
 
-# generate the following test curl command and pass to curlmin:
+# generate the following test curl command and pipe to curlmin
 # curl \
 #     -H 'Authorization: Bearer xyz789' \
 #     -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' \
@@ -70,9 +70,7 @@ Required authentication:
 #     -H 'Cookie: _gat=1; thisis=notneeded' \
 #     -b 'preference=dark; language=en; theme=blue' \
 #     'http://localhost:8080/api/test?auth_key=def456&timestamp=1623456789&tracking_id=abcdef123456&utm_source=test&utm_medium=cli&utm_campaign=curlmin'
-
-# pipe directly to curlmin (no flags needed)
-go run testserver/cmd/generate_test_curl.go | grep -v '#' | curlmin
+go run testserver/cmd/generate_test_curl.go | curlmin
 
 # prints this resulting minimized command
 curl -H 'Authorization: Bearer xyz789' -H 'Cookie: session=abc123' 'http://localhost:8080/api/test?auth_key=def456'
@@ -84,7 +82,7 @@ Since this tool actually executes the curl command to check the server response,
 
 ```
 # didn't start test server (see example above)
-curlmin -c "$(go run testserver/cmd/generate_test_curl.go | grep -v '#')"
+go run testserver/cmd/generate_test_curl.go | curlmin
 Error minimizing curl command: failed to get baseline response: failed to execute curl command: exit status 7, stderr:
 exit status 1
 ```
@@ -102,6 +100,7 @@ exit status 1
 - [ ] consolidate testing logic
 - [x] recognize `-` for reading from stdin
 - [ ] document library usage
+- [ ] group cli options
 
 ### License
 
