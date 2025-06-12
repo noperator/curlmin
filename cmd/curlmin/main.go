@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/noperator/curlmin/pkg/curlmin"
 	"github.com/spf13/pflag"
+	"golang.org/x/term"
 )
 
 func main() {
@@ -52,15 +54,36 @@ func main() {
 		curlCmd = *commandStr
 	} else if *commandFile != "" {
 		// Read the command from the file provided via -file/-f flag
-		fileBytes, err := os.ReadFile(*commandFile)
+		var fileBytes []byte
+		var err error
+
+		if *commandFile == "-" {
+			// Read from stdin if file is "-"
+			fileBytes, err = io.ReadAll(os.Stdin)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading from stdin: %v\n", err)
+				os.Exit(1)
+			}
+		} else {
+			// Read from the specified file
+			fileBytes, err = os.ReadFile(*commandFile)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Error reading from file %s: %v\n", *commandFile, err)
+				os.Exit(1)
+			}
+		}
+		curlCmd = string(fileBytes)
+	} else if stdinAvailable() {
+		// If no command source is specified but stdin is available, read from stdin
+		fileBytes, err := io.ReadAll(os.Stdin)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Error reading from file %s: %v\n", *commandFile, err)
+			fmt.Fprintf(os.Stderr, "Error reading from stdin: %v\n", err)
 			os.Exit(1)
 		}
 		curlCmd = string(fileBytes)
 	} else {
-		// If no command source is specified, show usage and exit
-		fmt.Fprintf(os.Stderr, "Error: either --command/-c or --file/-f is required\n\n")
+		// If no command source is specified and stdin is not available, show usage and exit
+		fmt.Fprintf(os.Stderr, "Error: either --command/-c or --file/-f is required, or pipe input via stdin\n\n")
 		fmt.Fprintf(os.Stderr, "Usage of %s:\n", os.Args[0])
 		pflag.PrintDefaults()
 		os.Exit(1)
@@ -99,4 +122,20 @@ func main() {
 		fmt.Println("Minimized curl command:")
 	}
 	fmt.Println(minimizedCmd)
+}
+
+// stdinAvailable checks if stdin is available (not a terminal and has data to read)
+func stdinAvailable() bool {
+	// Check if stdin is a terminal
+	if term.IsTerminal(int(os.Stdin.Fd())) {
+		return false
+	}
+
+	// Check if there's data available to read
+	stat, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+
+	return (stat.Mode() & os.ModeCharDevice) == 0
 }

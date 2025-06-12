@@ -38,9 +38,10 @@ Usage of curlmin:
       --words            Compare word count
 ```
 
-You must provide the curl command in one of two ways:
+You can provide the curl command in one of three ways:
 1. Using the `--command` or `-c` flag to specify the curl command as a string
-2. Using the `--file` or `-f` flag to read the curl command from a file
+2. Using the `--file` or `-f` flag to read the curl command from a file (use `-f -` to read from stdin)
+3. Piping the curl command directly to curlmin (e.g., `cat curl.sh | curlmin`)
 
 Use the provided test server to see how it works. Consider using the `-v` flag with `curlmin` so you can watch it progressively strip down the curl command.
 
@@ -68,10 +69,8 @@ Required authentication:
 #     -b 'preference=dark; language=en; theme=blue' \
 #     'http://localhost:8080/api/test?auth_key=def456&timestamp=1623456789&tracking_id=abcdef123456&utm_source=test&utm_medium=cli&utm_campaign=curlmin'
 
-# Using the --command/-c flag:
-curlmin --command "$(go run testserver/cmd/generate_test_curl.go | grep -v '#')"
-# or with the shorthand option:
-curlmin -c "$(go run testserver/cmd/generate_test_curl.go | grep -v '#')"
+# pipe directly to curlmin (no flags needed)
+go run testserver/cmd/generate_test_curl.go | grep -v '#' | curlmin
 
 # prints this resulting minimized command
 curl -H 'Authorization: Bearer xyz789' -H 'Cookie: session=abc123' 'http://localhost:8080/api/test?auth_key=def456'
@@ -99,7 +98,7 @@ exit status 1
 - [ ] optional delay between requests
 - [ ] detect session expiration
 - [ ] consolidate testing logic
-- [ ] recognize `-` for reading from stdin
+- [x] recognize `-` for reading from stdin
 - [ ] document library usage
 
 ### License
