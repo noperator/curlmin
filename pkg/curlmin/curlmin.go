@@ -37,6 +37,19 @@ func New(options Options) *Minimizer {
 }
 
 func (m *Minimizer) MinimizeCurlCommand(curlCmd string) (string, error) {
+	// Preprocess the curl command to remove comments and fold multi-line commands
+	preprocessed, err := PreprocessCurlCommand(curlCmd)
+	if err != nil {
+		// If preprocessing fails, try with the original command
+		if m.options.Verbose {
+			fmt.Printf("Warning: Failed to preprocess curl command: %v\n", err)
+			fmt.Printf("Proceeding with original command\n")
+		}
+	} else {
+		// Use the preprocessed command
+		curlCmd = preprocessed
+	}
+
 	// Parse the curl command into a syntax tree
 	curl, err := ParseCurlCommand(curlCmd)
 	if err != nil {

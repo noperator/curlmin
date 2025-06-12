@@ -9,6 +9,40 @@ import (
 	"mvdan.cc/sh/v3/syntax"
 )
 
+// PreprocessCurlCommand removes comments and folds multi-line commands into a single line
+func PreprocessCurlCommand(shellScript string) (string, error) {
+	// First pass: remove comments with Minify
+	parser := syntax.NewParser()
+	prog, err := parser.Parse(strings.NewReader(shellScript), "")
+	if err != nil {
+		return "", fmt.Errorf("failed to parse shell script: %w", err)
+	}
+
+	var buf1 strings.Builder
+	printer1 := syntax.NewPrinter(syntax.Minify(true))
+	err = printer1.Print(&buf1, prog)
+	if err != nil {
+		return "", fmt.Errorf("failed to minify shell script: %w", err)
+	}
+
+	// Second pass: fold to single line
+	noComments := buf1.String()
+	parser2 := syntax.NewParser()
+	prog2, err := parser2.Parse(strings.NewReader(noComments), "")
+	if err != nil {
+		return "", fmt.Errorf("failed to parse minified shell script: %w", err)
+	}
+
+	var buf2 strings.Builder
+	printer2 := syntax.NewPrinter(syntax.SingleLine(true))
+	err = printer2.Print(&buf2, prog2)
+	if err != nil {
+		return "", fmt.Errorf("failed to convert to single line: %w", err)
+	}
+
+	return strings.TrimSuffix(buf2.String(), "\n"), nil
+}
+
 // CurlCommand represents a curl command with its syntax tree
 type CurlCommand struct {
 	Program *syntax.File
