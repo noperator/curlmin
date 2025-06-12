@@ -15,7 +15,7 @@ A CLI tool that minimizes curl commands by removing unnecessary headers, cookies
 
 ### Install
 
-```bash
+```
 go install github.com/noperator/curlmin/cmd/curlmin@latest
 ```
 
@@ -23,15 +23,25 @@ go install github.com/noperator/curlmin/cmd/curlmin@latest
 
 Minimize everything by default (headers, cookies, and query parameters), or choose which items you want to minimize.
 
-```bash
+```
 Usage of curlmin:
+  -body
+    	Compare body content (default true)
+  -bytes
+    	Compare byte count
   -cookies
     	Minimize cookies (default true)
   -headers
     	Minimize headers (default true)
+  -lines
+    	Compare line count
   -params
     	Minimize query parameters (default true)
+  -status
+    	Compare status code
   -v	Verbose output
+  -words
+    	Compare word count
 
 # start test server
 go run testserver/server.go
