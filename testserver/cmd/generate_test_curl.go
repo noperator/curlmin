@@ -30,18 +30,17 @@ func main() {
 		"-H 'Upgrade-Insecure-Requests: 1'",
 	}
 
-	// Required cookies
-	requiredCookies := []string{
-		"-H 'Cookie: session=abc123'",
+	// Combined cookies in a single header (with required session cookie in the middle)
+	combinedCookieHeader := "-H 'Cookie: _ga=GA1.2.1234567890.1623456789; session=abc123; _gid=GA1.2.9876543210.1623456789'"
+
+	// Additional cookies in separate headers
+	additionalCookies := []string{
+		"-H 'Cookie: _fbp=fb.1.1623456789.1234567890'",
+		"-H 'Cookie: _gat=1; thisis=notneeded'",
 	}
 
-	// Unnecessary cookies
-	unnecessaryCookies := []string{
-		"-H 'Cookie: _ga=GA1.2.1234567890.1623456789'",
-		"-H 'Cookie: _gid=GA1.2.9876543210.1623456789'",
-		"-H 'Cookie: _fbp=fb.1.1623456789.1234567890'",
-		"-H 'Cookie: _gat=1'",
-	}
+	// Cookie flag with multiple cookies
+	cookieFlag := "-b 'preference=dark; language=en; theme=blue'"
 
 	// Build the curl command
 	curlCmd := "curl"
@@ -51,10 +50,16 @@ func main() {
 		curlCmd += " " + header
 	}
 
-	// Add all cookies
-	for _, cookie := range append(requiredCookies, unnecessaryCookies...) {
+	// Add the combined cookie header
+	curlCmd += " " + combinedCookieHeader
+
+	// Add additional cookie headers
+	for _, cookie := range additionalCookies {
 		curlCmd += " " + cookie
 	}
+
+	// Add the cookie flag
+	curlCmd += " " + cookieFlag
 
 	// Add the URL
 	curlCmd += " '" + baseURL + "'"

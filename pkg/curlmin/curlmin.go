@@ -444,6 +444,47 @@ func (m *Minimizer) minimizeHeaders(curl *CurlCommand, baselineResp Response) {
 	}
 }
 
+// testCookieRemoval tests if removing a specific cookie affects the response
+// Returns true if the cookie can be removed, false if it's needed
+func (m *Minimizer) testCookieRemoval(curl *CurlCommand, cookieIndex int, cookieName string, isHeader bool, baselineResp Response) (bool, error) {
+	// Create a copy of the curl command
+	originalCmd, err := curl.ToString()
+	if err != nil {
+		return false, err
+	}
+
+	curlCopy, err := ParseCurlCommand(originalCmd)
+	if err != nil {
+		return false, err
+	}
+
+	// Remove the cookie
+	var err2 error
+	if isHeader {
+		err2 = curlCopy.RemoveCookieFromHeader(cookieIndex, cookieName)
+	} else {
+		err2 = curlCopy.RemoveCookieFromCookieFlag(cookieIndex, cookieName)
+	}
+	if err2 != nil {
+		return false, err2
+	}
+
+	// Convert to string and test
+	testCmd, err := curlCopy.ToString()
+	if err != nil {
+		return false, err
+	}
+
+	// Execute the test command
+	testResp, err := m.executeCurlCommand(testCmd)
+	if err != nil {
+		return false, err
+	}
+
+	// Compare responses
+	return m.compareResponses(baselineResp, testResp), nil
+}
+
 func (m *Minimizer) minimizeCookies(curl *CurlCommand, baselineResp Response) {
 	// Process cookies iteratively
 	for {
@@ -464,108 +505,108 @@ func (m *Minimizer) minimizeCookies(curl *CurlCommand, baselineResp Response) {
 				headerStr := headerBuf.String()
 				headerStr = strings.Trim(headerStr, "'\"")
 
-				// If it's a Cookie header, extract and test each cookie
-				if strings.HasPrefix(strings.ToLower(headerStr), "cookie:") {
-					cookieStr := strings.TrimPrefix(headerStr, "Cookie:")
-					cookieStr = strings.TrimPrefix(cookieStr, "cookie:")
-					cookies := strings.Split(cookieStr, ";")
+				// Get the flag name for logging
+				var flagName string
+				if cookieIndex < len(curl.Command.Args) {
+					var flagBuf bytes.Buffer
+					printer.Print(&flagBuf, curl.Command.Args[cookieIndex])
+					flagName = flagBuf.String()
+				}
 
-					for _, cookie := range cookies {
-						cookie = strings.TrimSpace(cookie)
-						if cookie == "" {
+				// Determine if this is a Cookie header or a cookie flag
+				isHeader := strings.HasPrefix(strings.ToLower(headerStr), "cookie:")
+
+				// First, try removing the entire cookie argument
+				originalCmd, err := curl.ToString()
+				if err != nil {
+					continue
+				}
+
+				curlCopy, err := ParseCurlCommand(originalCmd)
+				if err != nil {
+					continue
+				}
+
+				// Remove the cookie argument
+				curlCopy.RemoveArg(cookieIndex)
+
+				// Convert to string and test
+				testCmd, err := curlCopy.ToString()
+				if err != nil {
+					continue
+				}
+
+				// Execute the test command
+				testResp, err := m.executeCurlCommand(testCmd)
+
+				if err == nil && m.compareResponses(baselineResp, testResp) {
+					// If the response is the same, update the original curl command
+					if m.options.Verbose {
+						if isHeader {
+							fmt.Printf("Cookie header not needed: %s\n", flagName)
+						} else {
+							fmt.Printf("Cookie flag not needed: %s\n", flagName)
+						}
+					}
+					curl.RemoveArg(cookieIndex)
+					foundRemovable = true
+					break
+				} else if m.options.Verbose {
+					if isHeader {
+						fmt.Printf("Cookie header needed, testing individual cookies\n")
+					} else {
+						fmt.Printf("Cookie flag needed, testing individual cookies\n")
+					}
+				}
+
+				// If we can't remove the entire argument, try removing individual cookies
+				var cookieStr string
+				if isHeader {
+					cookieStr = strings.TrimPrefix(headerStr, "Cookie:")
+					cookieStr = strings.TrimPrefix(cookieStr, "cookie:")
+				} else {
+					cookieStr = headerStr
+				}
+
+				cookies := strings.Split(cookieStr, ";")
+				for _, cookie := range cookies {
+					cookie = strings.TrimSpace(cookie)
+					if cookie == "" {
+						continue
+					}
+
+					parts := strings.SplitN(cookie, "=", 2)
+					if len(parts) == 2 {
+						cookieName := strings.TrimSpace(parts[0])
+
+						// Test if this cookie can be removed
+						canRemove, err := m.testCookieRemoval(curl, cookieIndex, cookieName, isHeader, baselineResp)
+						if err != nil {
 							continue
 						}
 
-						parts := strings.SplitN(cookie, "=", 2)
-						if len(parts) == 2 {
-							cookieName := strings.TrimSpace(parts[0])
-
-							// Create a copy of the curl command
-							originalCmd, err := curl.ToString()
-							if err != nil {
-								continue
+						if canRemove {
+							// If the response is the same, update the original curl command
+							if m.options.Verbose {
+								fmt.Printf("Cookie not needed: %s\n", cookieName)
 							}
 
-							curlCopy, err := ParseCurlCommand(originalCmd)
-							if err != nil {
-								continue
-							}
-
-							// Remove the cookie
-							err = curlCopy.RemoveCookieFromHeader(cookieIndex, cookieName)
-							if err != nil {
-								continue
-							}
-
-							// Convert to string and test
-							testCmd, err := curlCopy.ToString()
-							if err != nil {
-								continue
-							}
-
-							// Execute the test command
-							testResp, err := m.executeCurlCommand(testCmd)
-							if err == nil && m.compareResponses(baselineResp, testResp) {
-								// If the response is the same, update the original curl command
-								if m.options.Verbose {
-									fmt.Printf("Cookie not needed: %s\n", cookieName)
-								}
+							if isHeader {
 								curl.RemoveCookieFromHeader(cookieIndex, cookieName)
-								foundRemovable = true
-								break
-							} else if m.options.Verbose {
-								fmt.Printf("Cookie needed: %s\n", cookieName)
+							} else {
+								curl.RemoveCookieFromCookieFlag(cookieIndex, cookieName)
 							}
+
+							foundRemovable = true
+							break
+						} else if m.options.Verbose {
+							fmt.Printf("Cookie needed: %s\n", cookieName)
 						}
 					}
+				}
 
-					if foundRemovable {
-						break
-					}
-				} else {
-					// For -b/--cookie flags, try removing the entire argument
-					originalCmd, err := curl.ToString()
-					if err != nil {
-						continue
-					}
-
-					curlCopy, err := ParseCurlCommand(originalCmd)
-					if err != nil {
-						continue
-					}
-
-					// Remove the cookie argument
-					curlCopy.RemoveArg(cookieIndex)
-
-					// Convert to string and test
-					testCmd, err := curlCopy.ToString()
-					if err != nil {
-						continue
-					}
-
-					// Execute the test command
-					testResp, err := m.executeCurlCommand(testCmd)
-
-					// Get the cookie flag for logging
-					var cookieFlag string
-					if cookieIndex < len(curl.Command.Args) {
-						var flagBuf bytes.Buffer
-						printer := syntax.NewPrinter()
-						printer.Print(&flagBuf, curl.Command.Args[cookieIndex])
-						cookieFlag = flagBuf.String()
-					}
-
-					if err == nil && m.compareResponses(baselineResp, testResp) {
-						// If the response is the same, update the original curl command
-						if m.options.Verbose {
-							fmt.Printf("Cookie flag not needed: %s\n", cookieFlag)
-						}
-						curl.RemoveArg(cookieIndex)
-						foundRemovable = true
-						break
-					} else if m.options.Verbose {
-						fmt.Printf("Cookie flag needed: %s\n", cookieFlag)
-					}
+				if foundRemovable {
+					break
 				}
 			}
 		}
