@@ -18,6 +18,12 @@ type Options struct {
 	MinimizeCookies bool
 	MinimizeParams  bool
 	Verbose         bool
+	// Response comparison options
+	CompareStatusCode  bool
+	CompareBodyContent bool
+	CompareWordCount   bool
+	CompareLineCount   bool
+	CompareByteCount   bool
 }
 
 func DefaultOptions() Options {
@@ -26,6 +32,12 @@ func DefaultOptions() Options {
 		MinimizeCookies: true,
 		MinimizeParams:  true,
 		Verbose:         false,
+		// Default to comparing body content only (current behavior)
+		CompareStatusCode:  false,
+		CompareBodyContent: true,
+		CompareWordCount:   false,
+		CompareLineCount:   false,
+		CompareByteCount:   false,
 	}
 }
 
@@ -81,14 +93,28 @@ func (m *Minimizer) MinimizeCurlCommand(curlCmd string) (string, error) {
 	return minimizedCmd, nil
 }
 
-func (m *Minimizer) executeCurlCommand(curlCmd string) (string, error) {
-	// Create a temporary file to store the response
+// Response represents an HTTP response with its status code and body
+type Response struct {
+	StatusCode int
+	Body       string
+}
+
+func (m *Minimizer) executeCurlCommand(curlCmd string) (Response, error) {
+	// Create a temporary file to store the response body
 	tmpFile, err := os.CreateTemp("", "curlmin-response-*.txt")
 	if err != nil {
-		return "", fmt.Errorf("failed to create temporary file: %w", err)
+		return Response{}, fmt.Errorf("failed to create temporary file: %w", err)
 	}
 	defer os.Remove(tmpFile.Name())
 	tmpFile.Close()
+
+	// Create a temporary file to store the response headers
+	tmpHeaderFile, err := os.CreateTemp("", "curlmin-headers-*.txt")
+	if err != nil {
+		return Response{}, fmt.Errorf("failed to create temporary header file: %w", err)
+	}
+	defer os.Remove(tmpHeaderFile.Name())
+	tmpHeaderFile.Close()
 
 	// Make sure the command starts with curl
 	curlCmd = strings.TrimSpace(curlCmd)
@@ -96,8 +122,9 @@ func (m *Minimizer) executeCurlCommand(curlCmd string) (string, error) {
 		curlCmd = "curl " + curlCmd
 	}
 
-	// Add the -o flag to save the response to the temporary file
-	curlCmd = fmt.Sprintf("%s -o %s -s", curlCmd, tmpFile.Name())
+	// Add flags to save the response body and headers to temporary files
+	// -D writes headers to a file, -o writes body to a file, -s is silent mode
+	curlCmd = fmt.Sprintf("%s -D %s -o %s -s", curlCmd, tmpHeaderFile.Name(), tmpFile.Name())
 
 	// Log the curl command if verbose mode is enabled
 	if m.options.Verbose {
@@ -110,29 +137,99 @@ func (m *Minimizer) executeCurlCommand(curlCmd string) (string, error) {
 	cmd.Stderr = &stderr
 	err = cmd.Run()
 	if err != nil {
-		return "", fmt.Errorf("failed to execute curl command: %w, stderr: %s", err, stderr.String())
+		return Response{}, fmt.Errorf("failed to execute curl command: %w, stderr: %s", err, stderr.String())
 	}
 
-	// Read the response from the temporary file
+	// Read the response body from the temporary file
 	respBytes, err := os.ReadFile(tmpFile.Name())
 	if err != nil {
-		return "", fmt.Errorf("failed to read response from temporary file: %w", err)
+		return Response{}, fmt.Errorf("failed to read response from temporary file: %w", err)
 	}
 
-	// Return the response as a string
-	return string(respBytes), nil
+	// Read the response headers from the temporary file
+	headerBytes, err := os.ReadFile(tmpHeaderFile.Name())
+	if err != nil {
+		return Response{}, fmt.Errorf("failed to read headers from temporary file: %w", err)
+	}
+
+	// Parse the status code from the headers
+	statusCode := 0
+	headerLines := strings.Split(string(headerBytes), "\n")
+	if len(headerLines) > 0 {
+		statusLine := headerLines[0]
+		parts := strings.Split(statusLine, " ")
+		if len(parts) >= 2 {
+			_, err := fmt.Sscanf(parts[1], "%d", &statusCode)
+			if err != nil {
+				// If we can't parse the status code, default to 0
+				statusCode = 0
+			}
+		}
+	}
+
+	// Return the response
+	return Response{
+		StatusCode: statusCode,
+		Body:       string(respBytes),
+	}, nil
 }
 
-func (m *Minimizer) compareResponses(resp1, resp2 string) bool {
-	// Calculate MD5 hashes of the responses
-	hash1 := md5.Sum([]byte(resp1))
-	hash2 := md5.Sum([]byte(resp2))
+func (m *Minimizer) compareResponses(resp1, resp2 Response) bool {
+	// If no comparison options are selected, default to body content
+	if !m.options.CompareStatusCode &&
+		!m.options.CompareBodyContent &&
+		!m.options.CompareWordCount &&
+		!m.options.CompareLineCount &&
+		!m.options.CompareByteCount {
+		m.options.CompareBodyContent = true
+	}
 
-	// Compare the hashes
-	return hex.EncodeToString(hash1[:]) == hex.EncodeToString(hash2[:])
+	// Compare status code if selected
+	if m.options.CompareStatusCode {
+		if resp1.StatusCode != resp2.StatusCode {
+			return false
+		}
+	}
+
+	// Compare body content if selected
+	if m.options.CompareBodyContent {
+		hash1 := md5.Sum([]byte(resp1.Body))
+		hash2 := md5.Sum([]byte(resp2.Body))
+		if hex.EncodeToString(hash1[:]) != hex.EncodeToString(hash2[:]) {
+			return false
+		}
+	}
+
+	// Compare word count if selected
+	if m.options.CompareWordCount {
+		words1 := len(strings.Fields(resp1.Body))
+		words2 := len(strings.Fields(resp2.Body))
+		if words1 != words2 {
+			return false
+		}
+	}
+
+	// Compare line count if selected
+	if m.options.CompareLineCount {
+		lines1 := len(strings.Split(resp1.Body, "\n"))
+		lines2 := len(strings.Split(resp2.Body, "\n"))
+		if lines1 != lines2 {
+			return false
+		}
+	}
+
+	// Compare byte count if selected
+	if m.options.CompareByteCount {
+		if len(resp1.Body) != len(resp2.Body) {
+			return false
+		}
+	}
+
+	// If all selected comparisons pass, return true
+	return true
 }
 
-func (m *Minimizer) minimizeQueryParams(curl *CurlCommand, baselineResp string) {
+func (m *Minimizer) minimizeQueryParams(curl *CurlCommand, baselineResp Response) {
 	// Process query parameters iteratively
 	for {
 		// Get the URL index
@@ -268,7 +365,7 @@ func (m *Minimizer) minimizeQueryParams(curl *CurlCommand, baselineResp string) 
 	}
 }
 
-func (m *Minimizer) minimizeHeaders(curl *CurlCommand, baselineResp string) {
+func (m *Minimizer) minimizeHeaders(curl *CurlCommand, baselineResp Response) {
 	// Process headers iteratively
 	for {
 		// Find header arguments
@@ -347,7 +444,7 @@ func (m *Minimizer) minimizeHeaders(curl *CurlCommand, baselineResp string) {
 	}
 }
 
-func (m *Minimizer) minimizeCookies(curl *CurlCommand, baselineResp string) {
+func (m *Minimizer) minimizeCookies(curl *CurlCommand, baselineResp Response) {
 	// Process cookies iteratively
 	for {
 		// Find cookie arguments
