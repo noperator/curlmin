@@ -2,6 +2,8 @@
 
 A CLI tool that minimizes curl commands by removing unnecessary headers, cookies, and query parameters while ensuring the response remains the same.
 
+https://github.com/user-attachments/assets/c1acc4de-7836-494d-800e-1921ac93c8db
+
 How it works:
 
 1. Parses the curl command into a syntax tree 🌳
