@@ -437,10 +437,7 @@ func (m *Minimizer) testModification(curl *CurlCommand, baselineResp Response, m
 
 func (m *Minimizer) testCookieRemoval(curl *CurlCommand, cookieIndex int, cookieName string, isHeader bool, baselineResp Response) (bool, error) {
 	return m.testModification(curl, baselineResp, func(c *CurlCommand) error {
-		if isHeader {
-			return c.RemoveCookieFromHeader(cookieIndex, cookieName)
-		}
-		return c.RemoveCookieFromCookieFlag(cookieIndex, cookieName)
+		return c.RemoveCookieFromArg(cookieIndex, cookieName, isHeader)
 	})
 }
 
@@ -533,11 +530,7 @@ func (m *Minimizer) minimizeCookies(curl *CurlCommand, baselineResp Response) {
 								fmt.Printf("Cookie not needed: %s\n", cookieName)
 							}
 
-							if isHeader {
-								curl.RemoveCookieFromHeader(cookieIndex, cookieName)
-							} else {
-								curl.RemoveCookieFromCookieFlag(cookieIndex, cookieName)
-							}
+							curl.RemoveCookieFromArg(cookieIndex, cookieName, isHeader)
 
 							foundRemovable = true
 							break

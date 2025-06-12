@@ -377,18 +377,6 @@ func (c *CurlCommand) RemoveCookieFromArg(argIndex int, cookieName string, isHea
 	return nil
 }
 
-// RemoveCookieFromHeader removes a specific cookie from a Cookie header
-// This is a convenience wrapper around RemoveCookieFromArg
-func (c *CurlCommand) RemoveCookieFromHeader(headerIndex int, cookieName string) error {
-	return c.RemoveCookieFromArg(headerIndex, cookieName, true)
-}
-
-// RemoveCookieFromCookieFlag removes a specific cookie from a -b/--cookie flag
-// This is a convenience wrapper around RemoveCookieFromArg
-func (c *CurlCommand) RemoveCookieFromCookieFlag(cookieIndex int, cookieName string) error {
-	return c.RemoveCookieFromArg(cookieIndex, cookieName, false)
-}
-
 // ToString converts the curl command back to a string
 func (c *CurlCommand) ToString() (string, error) {
 	var buf bytes.Buffer
