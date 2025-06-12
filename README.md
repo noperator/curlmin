@@ -2,7 +2,7 @@
 
 A CLI tool that minimizes curl commands by removing unnecessary headers, cookies, and query parameters while ensuring the response remains the same.
 
-## How it works
+How it works:
 
 1. Parses the curl command into a syntax tree 🌳
 2. Makes a baseline request to get the expected response 📜
@@ -21,7 +21,7 @@ go install github.com/noperator/curlmin/cmd/curlmin@latest
 
 ### Usage
 
-Minimize everything by default (headers, cookies, and query parameters), or choose which items you want to minimize.
+Minimize everything by default (headers, cookies, and query parameters), or choose which items you want to minimize. You can also match on status code, or other body features (bytes, lines, words) besides content.
 
 ```
 Usage of curlmin:
@@ -42,8 +42,12 @@ Usage of curlmin:
   -v	Verbose output
   -words
     	Compare word count
+```
 
-# start test server
+Use the provided test server to see how it works. Consider using the `-v` flag with `curlmin` so you can watch it progressively strip down the curl command.
+
+```
+# start test server requiring a few auth-related items
 go run testserver/server.go
 Starting test server on http://localhost:8080
 Required authentication:
@@ -51,10 +55,23 @@ Required authentication:
   Auth Token: Bearer xyz789
   Query Parameter: auth_key=def456
 
-# pass curl command to curlmin
-curlmin "curl -H 'Authorization: Bearer xyz789' -H 'User-Agent: Mozilla/5.0' -H 'Accept: text/html' -H 'Cookie: session=abc123' -H 'Cookie: _ga=GA1.2.1234567890.1623456789' 'http://localhost:8080/api/test?auth_key=def456&timestamp=1623456789&utm_source=test'"
+# generate the following test curl command and pass to curlmin:
+# curl \
+#     -H 'Authorization: Bearer xyz789' \
+#     -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' \
+#     -H 'Accept: text/html,application/xhtml+xml,application/xml' \
+#     -H 'Accept-Language: en-US,en;q=0.9' \
+#     -H 'Cache-Control: max-age=0' \
+#     -H 'Connection: keep-alive' \
+#     -H 'Upgrade-Insecure-Requests: 1' \
+#     -H 'Cookie: _ga=GA1.2.1234567890.1623456789; session=abc123; _gid=GA1.2.9876543210.1623456789' \
+#     -H 'Cookie: _fbp=fb.1.1623456789.1234567890' \
+#     -H 'Cookie: _gat=1; thisis=notneeded' \
+#     -b 'preference=dark; language=en; theme=blue' \
+#     'http://localhost:8080/api/test?auth_key=def456&timestamp=1623456789&tracking_id=abcdef123456&utm_source=test&utm_medium=cli&utm_campaign=curlmin'
+curlmin "$(go run testserver/cmd/generate_test_curl.go | grep -v '#')"
 
-# prints this minimized command
+# prints this resulting minimized command
 curl -H 'Authorization: Bearer xyz789' -H 'Cookie: session=abc123' 'http://localhost:8080/api/test?auth_key=def456'
 ```
 
@@ -63,45 +80,10 @@ curl -H 'Authorization: Bearer xyz789' -H 'Cookie: session=abc123' 'http://local
 Since this tool actually executes the curl command to check the server response, that remote server actually needs to be _running_. So if you see this error, make sure you can actually reach the server you're validating the command against.
 
 ```
+# didn't start test server (see example above)
 curlmin "$(go run testserver/cmd/generate_test_curl.go | grep -v '#')"
 Error minimizing curl command: failed to get baseline response: failed to execute curl command: exit status 7, stderr:
 exit status 1
-```
-
-
-### Use as a library
-
-```go
-package main
-
-import (
-	"fmt"
-	"github.com/noperator/curlmin/pkg/curlmin"
-)
-
-func main() {
-	// Create a minimizer with default options
-	minimizer := curlmin.New(curlmin.DefaultOptions())
-
-	// Minimize a curl command
-	curlCmd := `curl -H 'Authorization: Bearer xyz789' -H 'User-Agent: Mozilla/5.0' -H 'Cookie: session=abc123' 'http://example.com/api?param1=value1&param2=value2'`
-	minimizedCmd, err := minimizer.MinimizeCurlCommand(curlCmd)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-
-	fmt.Printf("Minimized command: %s\n", minimizedCmd)
-}
-```
-
-### Testing
-
-Use the provided test suite to validate the minimization process.
-
-```bash
-cd pkg/curlmin
-go test -v
 ```
 
 ## Back matter
@@ -114,6 +96,9 @@ go test -v
 
 - [ ] optional delay between requests
 - [ ] detect session expiration
+- [ ] consolidate testing logic
+- [ ] recognize `-` for reading from stdin
+- [ ] document library usage
 
 ### License
 
