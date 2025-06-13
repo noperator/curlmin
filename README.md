@@ -1,10 +1,14 @@
 # curlmin - Curl Request Minimizer
 
-A CLI tool that minimizes curl commands by removing unnecessary headers, cookies, and query parameters while ensuring the response remains the same.
+A CLI tool that minimizes curl commands by removing unnecessary headers, cookies, and query parameters while ensuring the response remains the same. This is especially handy when copying a network request "as cURL" in Chrome DevTools' Network panel (Right-click page > Inspect > Network > Right-click request > Copy > Copy as cURL) as shown in this example:
 
 https://github.com/user-attachments/assets/c1acc4de-7836-494d-800e-1921ac93c8db
 
-How it works:
+## Description
+
+I use Chrome's "Copy as cURL" _a lot_ (so much, in fact, that I wrote [sol](https://github.com/noperator/sol) partially just to help me auto-format long curl commands). I often have this problem where the copied curl command contains a bunch of garbage (namely, extra headers and cookies for tracking purposes) that aren't at all relevant to the actual request being made. After years of manually trimming out cookies in order to see which ones are actually necessary to maintain a stateful authenticated session, I finally decided to make a tool to automate the minification of a curl command.
+
+### How it works
 
 1. Parses the curl command into a syntax tree 🌳
 2. Makes a baseline request to get the expected response 📜
@@ -12,6 +16,11 @@ How it works:
 4. After each removal, makes a new request and compares the response to the baseline  🧐
 5. If the response is the same, removes the unnecessary element 🚮
 6. Returns final minimized curl command 🎁
+
+### Features
+
+- Choose which request elements you want to **minimize**: headers, cookies, or query parameters. Minimizes all by default.
+- Choose which features of the response you want to **compare** against the baseline request: status code, body content, or body line/word/byte count. Compares body content by default.
 
 ## Getting started
 
@@ -22,8 +31,6 @@ go install github.com/noperator/curlmin/cmd/curlmin@latest
 ```
 
 ### Usage
-
-Minimize everything by default (headers, cookies, and query parameters), or choose which items you want to minimize. You can also match on status code, or other body features (bytes, lines, words) besides content.
 
 ```
 Usage of curlmin:
@@ -101,6 +108,7 @@ exit status 1
 - [x] recognize `-` for reading from stdin
 - [ ] document library usage
 - [ ] group cli options
+- [ ] handle joined flags, like `-skvL`
 
 ### License
 
