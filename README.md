@@ -6,7 +6,7 @@ https://github.com/user-attachments/assets/c1acc4de-7836-494d-800e-1921ac93c8db
 
 ## Description
 
-I use Chrome's "Copy as cURL" _a lot_ (so much, in fact, that I wrote [sol](https://github.com/noperator/sol) partially just to help me auto-format long curl commands). I often have this problem where the copied curl command contains a bunch of garbage (namely, extra headers and cookies for tracking purposes) that aren't at all relevant to the actual request being made. After years of manually trimming out cookies in order to see which ones are actually necessary to maintain a stateful authenticated session, I finally decided to make a tool to automate the minification of a curl command.
+I use Chrome's "Copy as cURL" _a lot_ (so much, in fact, that I wrote [sol](https://github.com/noperator/sol) partially just to help me auto-format long curl commands). I often have this problem where the copied curl command contains a bunch of garbage (namely, extra headers and cookies for tracking purposes) that isn't at all relevant to the actual request being made. After years of manually trimming out cookies in order to see which ones are actually necessary to maintain a stateful authenticated session, I finally decided to make a tool to automate the minification of a curl command.
 
 ### How it works
 
