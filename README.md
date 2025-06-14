@@ -33,18 +33,25 @@ go install github.com/noperator/curlmin/cmd/curlmin@latest
 ### Usage
 
 ```
-Usage of curlmin:
-      --body             Compare body content (default true)
-      --bytes            Compare byte count
+Input:
   -c, --command string   Curl command as a string
-      --cookies          Minimize cookies (default true)
   -f, --file string      File containing the curl command
-      --headers          Minimize headers (default true)
-      --lines            Compare line count
-      --params           Minimize query parameters (default true)
-      --status           Compare status code
-  -v, --verbose          Verbose output
-      --words            Compare word count
+
+Comparison:
+      --body     Compare body content (default true)
+      --bytes    Compare byte count
+      --lines    Compare line count
+      --status   Compare status code
+      --words    Compare word count
+
+Minimization:
+      --cookies   Minimize cookies (default true)
+      --headers   Minimize headers (default true)
+      --params    Minimize query parameters (default true)
+
+Flags:
+  -h, --help      help for curlmin
+  -v, --verbose   Verbose output
 ```
 
 You can provide the curl command in one of three ways:
