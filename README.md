@@ -1,6 +1,6 @@
 # curlmin - Curl Request Minimizer
 
-A CLI tool that minimizes curl commands by removing unnecessary headers, cookies, and query parameters while ensuring the response remains the same. This is especially handy when copying a network request "as cURL" in Chrome DevTools' Network panel (Right-click page > Inspect > Network > Right-click request > Copy > Copy as cURL) as shown in this example:
+A CLI tool that minimizes curl commands by removing unnecessary headers, cookies, and query parameters while ensuring the response remains the same. This is especially handy when copying a network request "as cURL" in Chrome DevTools' Network panel as shown in this example:
 
 https://github.com/user-attachments/assets/c1acc4de-7836-494d-800e-1921ac93c8db
 
