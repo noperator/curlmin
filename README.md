@@ -71,7 +71,10 @@ curl \
     'http://localhost:8080/api/test?auth_key=def456&timestamp=1623456789&tracking_id=abcdef123456&utm_source=test&utm_medium=cli&utm_campaign=curlmin'
 
 $ curlmin -f curl.sh
-curl -H 'Authorization: Bearer xyz789' -H 'Cookie: session=abc123' 'http://localhost:8080/api/test?auth_key=def456'
+curl \
+    -H 'Authorization: Bearer xyz789' \
+    -H 'Cookie: session=abc123' \
+    'http://localhost:8080/api/test?auth_key=def456'
 ```
 
 Note that in this example we're using the provided test server which requires a specific header, cookie, and query parameter to be set. You can start the server like this:
