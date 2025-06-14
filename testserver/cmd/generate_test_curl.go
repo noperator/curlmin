@@ -65,17 +65,11 @@ func main() {
 	curlCmd += " '" + baseURL + "'"
 
 	// Print the curl command
-	fmt.Println("# Test curl command with required and unnecessary elements")
+	fmt.Println("# A curl command with a mix of required and unnecessary elements:\n")
 	fmt.Println(curlCmd)
 
 	// Print instructions
-	fmt.Println("\n# To use this command with curlmin:")
-	fmt.Println("# 1. Start the test server: go run testserver/server.go")
-	fmt.Println("# 2. In another terminal, run one of the following:")
-	fmt.Println("#    - Using --command/-c flag: go run cmd/curlmin/main.go --command \"$(go run testserver/cmd/generate_test_curl.go)\"")
-	fmt.Println("#      or with the shorthand option: go run cmd/curlmin/main.go -c \"$(go run testserver/cmd/generate_test_curl.go)\"")
-	fmt.Println("#    - Using a file: ")
-	fmt.Println("#      a. Save the output to a file: go run testserver/cmd/generate_test_curl.go > test_curl.txt")
-	fmt.Println("#      b. Run curlmin with the file: go run cmd/curlmin/main.go --file test_curl.txt")
-	fmt.Println("#         or with the shorthand option: go run cmd/curlmin/main.go -f test_curl.txt")
+	fmt.Println("\n# To minify this curl command with curlmin:")
+	fmt.Println("# 1. In one terminal, start the test server:\n#    ```\n#    $ go run testserver/server.go\n#    ```")
+	fmt.Println("# 2. In another terminal, generate the curl command and pass it to curlmin:\n#    ```\n#    $ go run testserver/cmd/generate_test_curl.go | go run cmd/curlmin/main.go\n#    curl -H 'Authorization: Bearer xyz789' -H 'Cookie: session=abc123' 'http://localhost:8080/api/test?auth_key=def456'\n#    ```")
 }
