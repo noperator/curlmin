@@ -204,7 +204,7 @@ exit status 1
 - [ ] consolidate testing logic
 - [x] recognize `-` for reading from stdin
 - [ ] document library usage
-- [ ] group cli options
+- [x] group cli options
 
 ### License
 
